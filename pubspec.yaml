@@ -1,0 +1,36 @@
+name: elephant_tracker_app
+description: "An elephant tracking application for train drivers."
+publish_to: 'none' 
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.2.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # For the map view (OpenStreetMap)
+  flutter_map: ^6.1.0 
+  
+  # For LatLng objects used by flutter_map
+  latlong2: ^0.9.0 
+
+  # --- Firebase Packages ---
+  firebase_core: ^2.27.0
+  firebase_auth: ^4.17.8
+  firebase_database: ^10.4.8 # For the Realtime Database
+
+  # --- Location Package ---
+  geolocator: ^11.0.0
+
+  cupertino_icons: ^1.0.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+
+flutter:
+  uses-material-design: true
