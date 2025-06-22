@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:elephant_tracker_app/data/railway_data.dart'; // Import railway data
 import 'package:elephant_tracker_app/models/app_user.dart';
 import 'package:elephant_tracker_app/models/elephant.dart';
 import 'package:elephant_tracker_app/services/data_service.dart';
@@ -76,19 +77,23 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   Widget _buildMap() {
     List<Marker> markers = [];
+    List<Polyline> allTracks = RailwayData.allTracks.values.map((track) {
+      return Polyline(
+        points: track,
+        strokeWidth: 4.0,
+        color: Colors.black.withOpacity(0.5),
+      );
+    }).toList();
 
     markers.addAll(_elephants.map((elephant) {
       final isHighlighted = _mapLogicController.isPointInPolygon(
           elephant.position, _specialAreaPoints);
       return Marker(
         point: elephant.position,
-        width: 80,
-        height: 80,
+        width: 80, height: 80,
         child: Icon(
           Icons.location_on,
-          color: isHighlighted
-              ? Colors.yellow[700]
-              : Theme.of(context).colorScheme.secondary,
+          color: isHighlighted ? Colors.yellow[700] : Theme.of(context).colorScheme.secondary,
           size: isHighlighted ? 40 : 30,
         ),
       );
@@ -97,10 +102,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     if (_trainPosition != null) {
       markers.add(Marker(
         point: _trainPosition!,
-        width: 80,
-        height: 80,
-        child: Icon(Icons.train,
-            color: Theme.of(context).colorScheme.primary, size: 30),
+        width: 80, height: 80,
+        child: Icon(Icons.train, color: Theme.of(context).colorScheme.primary, size: 30),
       ));
     }
 
@@ -108,17 +111,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       mapController: _mapController,
       options: MapOptions(
         initialCenter: const LatLng(7.8731, 80.7718),
-        initialZoom: 9.0,
+        initialZoom: 8.0, // Zoom out to see more tracks
         onTap: _handleMapTap,
       ),
       children: [
-        if (_currentTileLayer == 'Street')
-          TileLayer(
-              urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'),
-        if (_currentTileLayer == 'Satellite')
-          TileLayer(
-              urlTemplate:
-              'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'),
+        if (_currentTileLayer == 'Street') TileLayer(urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'),
+        if (_currentTileLayer == 'Satellite') TileLayer(urlTemplate: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'),
+
+        PolylineLayer(polylines: allTracks),
+
         if (_specialAreaPoints.length > 2)
           PolygonLayer(polygons: [
             Polygon(
@@ -136,6 +137,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // ... rest of the build method is unchanged ...
     return Scaffold(
       appBar: AppBar(
         title: Text('Admin Dashboard (${widget.user.username})'),
@@ -178,7 +180,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   ),
                 ),
                 const SizedBox(height: 10),
-                // --- FIX: Logic for drawing and clearing is now separated ---
                 FloatingActionButton(
                   onPressed: () => setState(() {
                     _isDrawingMode = !_isDrawingMode;

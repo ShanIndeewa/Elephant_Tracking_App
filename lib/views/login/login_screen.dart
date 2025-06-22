@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:elephant_tracker_app/controllers/auth_controller.dart';
@@ -12,25 +13,58 @@ class LoginScreen extends StatefulWidget {
   _LoginScreenState createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStateMixin {
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   final _authController = AuthController();
   bool _isLoading = false;
 
-  void _login() async {
-    setState(() {
-      _isLoading = true;
-    });
+  // --- Animation Controllers ---
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
 
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    );
+
+    // Fade animation for the logo
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: const Interval(0.0, 0.6, curve: Curves.easeIn),
+      ),
+    );
+
+    // Slide animation for the form fields
+    _slideAnimation = Tween<Offset>(begin: const Offset(0, 0.5), end: Offset.zero).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: const Interval(0.4, 1.0, curve: Curves.easeOut),
+      ),
+    );
+
+    // Start the animation
+    _animationController.forward();
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  void _login() async {
+    setState(() => _isLoading = true);
     final user = await _authController.loginUser(
       _usernameController.text,
       _passwordController.text,
     );
-
-    setState(() {
-      _isLoading = false;
-    });
+    setState(() => _isLoading = false);
 
     if (user != null) {
       if (!mounted) return;
@@ -47,7 +81,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Invalid username or password.'),
+          content: Text('Invalid credentials.'),
           backgroundColor: Colors.redAccent,
         ),
       );
@@ -57,61 +91,69 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Gaja-Mithra Login')),
+      backgroundColor: Theme.of(context).colorScheme.background,
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
+          padding: const EdgeInsets.all(32.0),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // --- App Logo ---
-              FaIcon(
-                FontAwesomeIcons.shieldHeart,
-                size: 80,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              const SizedBox(height: 20),
-              // --- Welcome Message ---
-              Text(
-                'Welcome to Gaja-Mithra',
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.primary,
-                    fontWeight: FontWeight.bold),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 40),
-              // --- Form Fields ---
-              TextField(
-                controller: _usernameController,
-                decoration: const InputDecoration(
-                  labelText: 'Username',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.person_outline),
+              // --- Animated Logo ---
+              FadeTransition(
+                opacity: _fadeAnimation,
+                child: Image.asset(
+                  'assets/logo.png', // Make sure you have this file
+                  height: 150,
                 ),
               ),
-              const SizedBox(height: 20),
-              TextField(
-                controller: _passwordController,
-                obscureText: true,
-                decoration: const InputDecoration(
-                    labelText: 'Password',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.lock_outline)),
-              ),
-              const SizedBox(height: 40),
-              // --- Login Button ---
-              _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : ElevatedButton(
-                onPressed: _login,
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  backgroundColor: Theme.of(context).colorScheme.primary,
-                  foregroundColor:
-                  Theme.of(context).colorScheme.onPrimary,
+              const SizedBox(height: 50),
+              // --- Animated Form ---
+              SlideTransition(
+                position: _slideAnimation,
+                // FIX: The FadeTransition now uses the same animation curve as the slide
+                // for a synchronized fade-in and slide-up effect.
+                child: FadeTransition(
+                  opacity: _animationController.drive(
+                    CurveTween(curve: const Interval(0.4, 1.0, curve: Curves.easeOut)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      TextField(
+                        controller: _usernameController,
+                        decoration: const InputDecoration(
+                          labelText: 'Email',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.person_outline),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      TextField(
+                        controller: _passwordController,
+                        obscureText: true,
+                        decoration: const InputDecoration(
+                            labelText: 'Password',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.lock_outline)),
+                      ),
+                      const SizedBox(height: 40),
+                      _isLoading
+                          ? const Center(child: CircularProgressIndicator())
+                          : ElevatedButton(
+                        onPressed: _login,
+                        style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            backgroundColor: Theme.of(context).colorScheme.primary,
+                            foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            )
+                        ),
+                        child: const Text('Login'),
+                      ),
+                    ],
+                  ),
                 ),
-                child: const Text('Login'),
               ),
             ],
           ),

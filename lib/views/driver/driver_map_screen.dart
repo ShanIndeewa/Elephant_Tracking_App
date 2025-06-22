@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:elephant_tracker_app/data/railway_data.dart'; // Import railway data
 import 'package:elephant_tracker_app/models/app_user.dart';
 import 'package:elephant_tracker_app/models/elephant.dart';
 import 'package:elephant_tracker_app/services/data_service.dart';
@@ -18,7 +19,8 @@ class DriverMapScreen extends StatefulWidget {
   _DriverMapScreenState createState() => _DriverMapScreenState();
 }
 
-class _DriverMapScreenState extends State<DriverMapScreen> {
+// Add TickerProviderStateMixin for the animation controller
+class _DriverMapScreenState extends State<DriverMapScreen> with TickerProviderStateMixin {
   final DataService _dataService = DataService();
   final AuthController _authController = AuthController();
   final AppMapController.MapController _mapLogicController = AppMapController.MapController();
@@ -34,24 +36,37 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
   Color _alertColor = Colors.green;
   bool _isMapReady = false;
   String _currentTileLayer = 'Street';
-  bool _isTrackInDanger = false;
+  bool _isCurrentTrackInDanger = false;
 
-  final List<LatLng> _railwayTrack = [
-    const LatLng(7.865, 80.765), const LatLng(7.870, 80.770),
-    const LatLng(7.875, 80.772), const LatLng(7.880, 80.775),
-    const LatLng(7.885, 80.773), const LatLng(7.890, 80.778),
-    const LatLng(7.895, 80.782),
-  ];
+  final String _driverRouteKey = 'main_line';
+
+  // --- Animation Controller for Loading Screen ---
+  late AnimationController _animationController;
+  late Animation<double> _scaleAnimation;
+
 
   @override
   void initState() {
     super.initState();
+
+    // --- Setup for the loading animation ---
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    )..repeat(reverse: true);
+
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 1.4).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
+
+    // --- Original setup ---
     _dataService.startSendingTrainLocation();
     _startListeningToData();
   }
 
   @override
   void dispose() {
+    _animationController.dispose(); // Dispose the animation controller
     _dataService.stopSendingTrainLocation();
     _trainSubscription?.cancel();
     _elephantSubscription?.cancel();
@@ -94,13 +109,15 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
 
     const double TRACK_DANGER_DISTANCE = 100;
 
-    for (var elephant in _elephants) {
-      double distance = _mapLogicController.getDistance(_trainPosition!, elephant.position);
-      if (distance < AppMapController.MapController.DANGER_ZONE_RADIUS) dangerFound = true;
-      if (distance < AppMapController.MapController.CAUTION_ZONE_RADIUS) cautionFound = true;
+    List<LatLng> currentRoute = RailwayData.allTracks[_driverRouteKey] ?? [];
 
-      for (int i = 0; i < _railwayTrack.length - 1; i++) {
-        if (_mapLogicController.getDistance(elephant.position, _railwayTrack[i]) < TRACK_DANGER_DISTANCE) {
+    for (var elephant in _elephants) {
+      double distanceToTrain = _mapLogicController.getDistance(_trainPosition!, elephant.position);
+      if (distanceToTrain < AppMapController.MapController.DANGER_ZONE_RADIUS) dangerFound = true;
+      if (distanceToTrain < AppMapController.MapController.CAUTION_ZONE_RADIUS) cautionFound = true;
+
+      for (int i = 0; i < currentRoute.length - 1; i++) {
+        if (_mapLogicController.getDistance(elephant.position, currentRoute[i]) < TRACK_DANGER_DISTANCE) {
           trackDanger = true;
           break;
         }
@@ -109,10 +126,10 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
     }
 
     setState(() {
-      _isTrackInDanger = trackDanger;
+      _isCurrentTrackInDanger = trackDanger;
       if (dangerFound) {
         _alertMessage = "DANGER! Elephant in proximity!";
-        _alertColor = Colors.red;
+        _alertColor = Theme.of(context).colorScheme.error;
       } else if (cautionFound) {
         _alertMessage = "CAUTION: Elephant nearby";
         _alertColor = Colors.orangeAccent;
@@ -126,11 +143,42 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
   @override
   Widget build(BuildContext context) {
     if (_trainPosition == null) {
+      // --- New Animated Loading Screen ---
       return Scaffold(
         appBar: AppBar(title: Text('Driver View (${widget.user.username})')),
-        body: const Center(child: CircularProgressIndicator()),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              ScaleTransition(
+                scale: _scaleAnimation,
+                child: Icon(
+                  Icons.gps_fixed,
+                  size: 60,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Waiting for GPS signal...',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+            ],
+          ),
+        ),
       );
     }
+
+    List<Polyline> allTracks = RailwayData.allTracks.entries.map((entry) {
+      final isCurrentRoute = entry.key == _driverRouteKey;
+      return Polyline(
+        points: entry.value,
+        strokeWidth: isCurrentRoute ? 6.0 : 3.0,
+        color: isCurrentRoute
+            ? (_isCurrentTrackInDanger ? Colors.red.withOpacity(0.9) : Theme.of(context).colorScheme.primary.withOpacity(0.8))
+            : Colors.black.withOpacity(0.3),
+      );
+    }).toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -154,15 +202,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
               if (_currentTileLayer == 'Satellite')
                 TileLayer(urlTemplate: '[https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/](https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/){z}/{y}/{x}'),
 
-              PolylineLayer(
-                polylines: [
-                  Polyline(
-                    points: _railwayTrack,
-                    strokeWidth: 5.0,
-                    color: _isTrackInDanger ? Colors.red.withOpacity(0.8) : Colors.black.withOpacity(0.4),
-                  ),
-                ],
-              ),
+              PolylineLayer(polylines: allTracks),
 
               CircleLayer(
                 circles: [
