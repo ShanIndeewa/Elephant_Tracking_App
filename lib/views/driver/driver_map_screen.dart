@@ -2,10 +2,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:elephant_tracker_app/data/railway_data.dart'; // Import railway data
+import 'package:elephant_tracker_app/data/railway_data.dart';
 import 'package:elephant_tracker_app/models/app_user.dart';
 import 'package:elephant_tracker_app/models/elephant.dart';
 import 'package:elephant_tracker_app/services/data_service.dart';
+import 'package:elephant_tracker_app/services/ai_service.dart';
 import 'package:elephant_tracker_app/controllers/auth_controller.dart';
 import 'package:elephant_tracker_app/controllers/map_controller.dart' as AppMapController;
 import 'package:elephant_tracker_app/views/login/login_screen.dart';
@@ -19,12 +20,12 @@ class DriverMapScreen extends StatefulWidget {
   _DriverMapScreenState createState() => _DriverMapScreenState();
 }
 
-// Add TickerProviderStateMixin for the animation controller
-class _DriverMapScreenState extends State<DriverMapScreen> with TickerProviderStateMixin {
+class _DriverMapScreenState extends State<DriverMapScreen> {
   final DataService _dataService = DataService();
   final AuthController _authController = AuthController();
   final AppMapController.MapController _mapLogicController = AppMapController.MapController();
   final MapController _flutterMapController = MapController();
+  final AIService _aiService = AIService();
 
   StreamSubscription? _trainSubscription;
   StreamSubscription? _elephantSubscription;
@@ -36,37 +37,18 @@ class _DriverMapScreenState extends State<DriverMapScreen> with TickerProviderSt
   Color _alertColor = Colors.green;
   bool _isMapReady = false;
   String _currentTileLayer = 'Street';
-  bool _isCurrentTrackInDanger = false;
 
-  final String _driverRouteKey = 'main_line';
-
-  // --- Animation Controller for Loading Screen ---
-  late AnimationController _animationController;
-  late Animation<double> _scaleAnimation;
-
+  DateTime? _lastIncidentTime;
 
   @override
   void initState() {
     super.initState();
-
-    // --- Setup for the loading animation ---
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    )..repeat(reverse: true);
-
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 1.4).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
-    );
-
-    // --- Original setup ---
     _dataService.startSendingTrainLocation();
     _startListeningToData();
   }
 
   @override
   void dispose() {
-    _animationController.dispose(); // Dispose the animation controller
     _dataService.stopSendingTrainLocation();
     _trainSubscription?.cancel();
     _elephantSubscription?.cancel();
@@ -94,91 +76,71 @@ class _DriverMapScreenState extends State<DriverMapScreen> with TickerProviderSt
 
   void _logout() async {
     await _authController.logoutUser();
-    if (!mounted) return;
+    if(!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (context) => const LoginScreen()),
           (Route<dynamic> route) => false,
     );
   }
 
-  void _updateAlerts() {
+  void _updateAlerts() async {
     if (_trainPosition == null) return;
-    bool dangerFound = false;
-    bool cautionFound = false;
-    bool trackDanger = false;
 
-    const double TRACK_DANGER_DISTANCE = 100;
-
-    List<LatLng> currentRoute = RailwayData.allTracks[_driverRouteKey] ?? [];
+    int closeElephantCount = 0;
+    double closestDistance = double.infinity;
 
     for (var elephant in _elephants) {
-      double distanceToTrain = _mapLogicController.getDistance(_trainPosition!, elephant.position);
-      if (distanceToTrain < AppMapController.MapController.DANGER_ZONE_RADIUS) dangerFound = true;
-      if (distanceToTrain < AppMapController.MapController.CAUTION_ZONE_RADIUS) cautionFound = true;
-
-      for (int i = 0; i < currentRoute.length - 1; i++) {
-        if (_mapLogicController.getDistance(elephant.position, currentRoute[i]) < TRACK_DANGER_DISTANCE) {
-          trackDanger = true;
-          break;
-        }
+      double distance = _mapLogicController.getDistance(_trainPosition!, elephant.position);
+      if (distance < AppMapController.MapController.DANGER_ZONE_RADIUS) {
+        closeElephantCount++;
+        if(distance < closestDistance) closestDistance = distance;
       }
-      if (trackDanger) break;
     }
 
-    setState(() {
-      _isCurrentTrackInDanger = trackDanger;
-      if (dangerFound) {
-        _alertMessage = "DANGER! Elephant in proximity!";
-        _alertColor = Theme.of(context).colorScheme.error;
-      } else if (cautionFound) {
-        _alertMessage = "CAUTION: Elephant nearby";
-        _alertColor = Colors.orangeAccent;
-      } else {
+    if (closeElephantCount > 0) {
+      if (_lastIncidentTime == null || DateTime.now().difference(_lastIncidentTime!).inMinutes > 1) {
+
+        if(!mounted) return;
+        setState(() => _alertMessage = "Generating smart alert...");
+
+        final dynamicAlert = await _aiService.generateDynamicAlert(
+          elephantCount: closeElephantCount,
+          distance: closestDistance,
+          trainLocation: _trainPosition!,
+        );
+
+        _dataService.logIncident({
+          'timestamp': DateTime.now().millisecondsSinceEpoch,
+          'location': {'lat': _trainPosition!.latitude, 'lng': _trainPosition!.longitude},
+          'elephantCount': closeElephantCount,
+          'trainId': widget.user.username,
+        });
+
+        if(!mounted) return;
+        setState(() {
+          _alertMessage = dynamicAlert;
+          _alertColor = Theme.of(context).colorScheme.error;
+          _lastIncidentTime = DateTime.now();
+        });
+      }
+    } else {
+      if(!mounted) return;
+      setState(() {
         _alertMessage = "All Clear";
         _alertColor = Colors.green;
-      }
-    });
+        _lastIncidentTime = null;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     if (_trainPosition == null) {
-      // --- New Animated Loading Screen ---
       return Scaffold(
         appBar: AppBar(title: Text('Driver View (${widget.user.username})')),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              ScaleTransition(
-                scale: _scaleAnimation,
-                child: Icon(
-                  Icons.gps_fixed,
-                  size: 60,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'Waiting for GPS signal...',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-            ],
-          ),
-        ),
+        body: const Center(child: CircularProgressIndicator()),
       );
     }
-
-    List<Polyline> allTracks = RailwayData.allTracks.entries.map((entry) {
-      final isCurrentRoute = entry.key == _driverRouteKey;
-      return Polyline(
-        points: entry.value,
-        strokeWidth: isCurrentRoute ? 6.0 : 3.0,
-        color: isCurrentRoute
-            ? (_isCurrentTrackInDanger ? Colors.red.withOpacity(0.9) : Theme.of(context).colorScheme.primary.withOpacity(0.8))
-            : Colors.black.withOpacity(0.3),
-      );
-    }).toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -200,9 +162,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> with TickerProviderSt
               if (_currentTileLayer == 'Street')
                 TileLayer(urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'),
               if (_currentTileLayer == 'Satellite')
-                TileLayer(urlTemplate: '[https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/](https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/){z}/{y}/{x}'),
-
-              PolylineLayer(polylines: allTracks),
+                TileLayer(urlTemplate: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'),
 
               CircleLayer(
                 circles: [

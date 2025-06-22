@@ -4,6 +4,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:elephant_tracker_app/models/elephant.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../models/incident.dart';
+
 class DataService {
   final FirebaseDatabase _db = FirebaseDatabase.instance;
   StreamSubscription<Position>? _positionStreamSubscription;
@@ -82,4 +84,27 @@ class DataService {
       return const LatLng(0, 0); // Default position
     });
   }
+
+  // --- NEW: Incident Logging and Fetching ---
+
+  Future<void> logIncident(Map<String, dynamic> incidentData) async {
+    // Use push() to generate a unique ID for each new incident
+    await _db.ref('incidents').push().set(incidentData);
+  }
+
+  Stream<List<Incident>> getIncidentsStream() {
+    return _db.ref('incidents').onValue.map((event) {
+      final List<Incident> incidents = [];
+      final data = event.snapshot.value;
+      if (data != null && data is Map) {
+        data.forEach((key, value) {
+          incidents.add(Incident.fromMap(key, value));
+        });
+      }
+      // Sort by newest first
+      incidents.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+      return incidents;
+    });
+  }
+
 }

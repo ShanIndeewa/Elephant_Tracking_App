@@ -11,6 +11,8 @@ import 'package:elephant_tracker_app/controllers/map_controller.dart' as AppMapC
 import 'package:elephant_tracker_app/views/login/login_screen.dart';
 import 'package:elephant_tracker_app/views/admin/create_driver_screen.dart';
 
+import 'incident_list_screen.dart';
+
 class AdminDashboardScreen extends StatefulWidget {
   final AppUser user;
   const AdminDashboardScreen({super.key, required this.user});
@@ -142,6 +144,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       appBar: AppBar(
         title: Text('Admin Dashboard (${widget.user.username})'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.history),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const IncidentListScreen()),
+              );
+            },
+            tooltip: 'View Incidents',
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: _logout,

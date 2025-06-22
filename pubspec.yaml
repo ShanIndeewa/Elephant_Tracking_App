@@ -11,22 +11,20 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # For the map view (OpenStreetMap)
   flutter_map: ^6.1.0
-
-  # For LatLng objects used by flutter_map
   latlong2: ^0.9.0
 
   # --- Firebase Packages ---
   firebase_core: ^2.27.0
   firebase_auth: ^4.17.8
-  firebase_database: ^10.4.8 # For the Realtime Database
+  firebase_database: ^10.4.8
 
-  # --- Location Package ---
+  # --- Location & Icons ---
   geolocator: ^11.0.0
-
-  # --- Icon Package ---
   font_awesome_flutter: ^10.7.0
+
+  # --- Google AI Package ---
+  google_generative_ai: ^0.4.0
 
   cupertino_icons: ^1.0.2
 
@@ -38,6 +36,5 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
-  # --- Add this assets section ---
   assets:
     - assets/
