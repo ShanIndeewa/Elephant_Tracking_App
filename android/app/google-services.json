@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "985941268926",
+    "firebase_url": "https://elephant-tracker-44677-default-rtdb.firebaseio.com",
+    "project_id": "elephant-tracker-44677",
+    "storage_bucket": "elephant-tracker-44677.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:985941268926:android:c8cda9c6ebdf8d6acc41ef",
+        "android_client_info": {
+          "package_name": "com.example.elephant_tracking"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCviFc71eV-7WpGdHWMBUO30Yii2O_emfs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
