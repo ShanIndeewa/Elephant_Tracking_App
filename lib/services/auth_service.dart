@@ -66,4 +66,9 @@ class AuthService {
       return "An unexpected error occurred.";
     }
   }
+
+  // New method to sign the user out
+  Future<void> logout() async {
+    await _auth.signOut();
+  }
 }

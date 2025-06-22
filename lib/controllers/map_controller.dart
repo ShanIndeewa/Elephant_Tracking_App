@@ -17,4 +17,25 @@ class MapController {
             2;
     return 12742 * asin(sqrt(a)) * 1000; // 2 * R * 1000
   }
+
+  // Ray-casting algorithm to check if a point is inside a polygon
+  bool isPointInPolygon(LatLng point, List<LatLng> polygon) {
+    if (polygon.length < 3) {
+      return false;
+    }
+    bool isInside = false;
+    int j = polygon.length - 1;
+    for (int i = 0; i < polygon.length; j = i++) {
+      if (((polygon[i].latitude > point.latitude) !=
+          (polygon[j].latitude > point.latitude)) &&
+          (point.longitude <
+              (polygon[j].longitude - polygon[i].longitude) *
+                  (point.latitude - polygon[i].latitude) /
+                  (polygon[j].latitude - polygon[i].latitude) +
+                  polygon[i].longitude)) {
+        isInside = !isInside;
+      }
+    }
+    return isInside;
+  }
 }

@@ -11,8 +11,12 @@ class AuthController {
     return _authService.login(username, password);
   }
 
-  // New method to be called from the UI
   Future<String?> createDriverAccount(String email, String password) {
     return _authService.createDriver(email, password);
+  }
+
+  // New method to handle logout
+  Future<void> logoutUser() {
+    return _authService.logout();
   }
 }

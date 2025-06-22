@@ -21,7 +21,7 @@ class DataService {
         return;
       }
     }
-    
+
     if (permission == LocationPermission.deniedForever) {
       print('Location permissions are permanently denied, we cannot request permissions.');
       return;

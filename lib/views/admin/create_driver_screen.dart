@@ -30,8 +30,9 @@ class _CreateDriverScreenState extends State<CreateDriverScreen> {
         _isLoading = false;
       });
 
+      if (!mounted) return;
       if (error == null) {
-         ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Driver account for "${_usernameController.text}" created successfully!'),
             backgroundColor: Colors.green,
@@ -63,7 +64,7 @@ class _CreateDriverScreenState extends State<CreateDriverScreen> {
             children: [
               Text(
                 'New Driver Account',
-                style: Theme.of(context).textTheme.headlineSmall,
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: Theme.of(context).colorScheme.onBackground),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 40),
@@ -82,7 +83,7 @@ class _CreateDriverScreenState extends State<CreateDriverScreen> {
               TextFormField(
                 controller: _passwordController,
                 obscureText: true,
-                decoration: const InputDecoration(labelText: 'Temporary Password', border: OutlineInputBorder()),
+                decoration: const InputDecoration(labelText: 'Password', border: OutlineInputBorder()),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Please enter a password';
@@ -97,12 +98,14 @@ class _CreateDriverScreenState extends State<CreateDriverScreen> {
               _isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : ElevatedButton(
-                      onPressed: _createDriver,
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                      child: const Text('Create Account'),
-                    ),
+                onPressed: _createDriver,
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                ),
+                child: const Text('Create Account'),
+              ),
             ],
           ),
         ),
